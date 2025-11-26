@@ -1,6 +1,8 @@
 package com.example.smartaccess
 
 import android.app.Application
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.smartaccess.models.AppData
@@ -10,6 +12,7 @@ import com.google.gson.Gson
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -23,6 +26,7 @@ data class UiState(
     val user: UserModel? = null
 )
 
+@RequiresApi(Build.VERSION_CODES.O)
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(UiState())
@@ -50,6 +54,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+    fun hasAccess(moduleId: String): Boolean = accessManager?.hasAccess(moduleId) ?: false
 
     private fun loadMock() {
         val am = getApplication<Application>().assets.open("mock_data.json")
@@ -68,17 +73,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     fun onModuleClick(module: ModuleModel) {
         val am = accessManager ?: return
         val msg = when {
             am.isInCoolingPeriod(Instant.now()) -> "Access denied: cooling period"
             !am.hasAccess(module.id) -> "Access denied: no permission"
-            else -> "Navigating to ${'$'}{module.title}"
+            else -> "Navigating to ${module.title}"
         }
         _uiState.value = _uiState.value.copy(lastMessage = msg)
 
         viewModelScope.launch {
-            delay(2000)
+            while (isActive) {
+                delay(1000L)
+            }
             _uiState.value = _uiState.value.copy(lastMessage = null)
         }
     }
